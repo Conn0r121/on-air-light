@@ -7,9 +7,14 @@ on_air_test:
   name: On Air (test light)
   icon: mdi:broadcast
 
-# Mirrors the microphone state reported by windows-mic-detector/mic_watcher.ps1.
-# The webhook automation keeps it in sync; the light automation reads it.
-# Keep this one even after the hardware arrives.
-mic_active:
-  name: Mic active (office PC)
+# One boolean per PC running windows-mic-detector/mic_watcher.ps1. The name
+# suffix must match that PC's $SourceName ("mic_active_" + source). The webhook
+# automation keeps them in sync; the light automation ORs across them.
+# Keep these even after the hardware arrives.
+mic_active_laptop:
+  name: Mic active (laptop)
+  icon: mdi:microphone
+
+mic_active_gaming:
+  name: Mic active (gaming PC)
   icon: mdi:microphone

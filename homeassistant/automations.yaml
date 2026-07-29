@@ -2,43 +2,50 @@
 # Loaded from configuration.yaml via `automation: !include automations.yaml`.
 #
 # Two automations:
-#   1. mic webhook  -> input_boolean.mic_active   (stores the mic state)
-#   2. calendar OR mic -> light                   (the actual on-air logic)
+#   1. mic webhook -> per-PC mic booleans   (stores each PC's mic state)
+#   2. calendar OR any mic -> light         (the actual on-air logic)
 
 # ------------------------------------------------------------------------------
-# 1. Mirror the PC mic state into input_boolean.mic_active.
+# 1. Mirror each PC's mic state into its own input_boolean.
 #
-# windows-mic-detector/mic_watcher.ps1 POSTs {"active": true|false} to:
+# windows-mic-detector/mic_watcher.ps1 runs on every PC you care about and
+# POSTs {"active": true|false, "source": "<name>"} to:
 #   http://<pi-ip>:8123/api/webhook/mic_active
 #
-# Webhook triggers are fire-and-forget and carry no state of their own, so the
-# last-reported state is stored in an input_boolean that templates can read.
+# "source" is the $SourceName set at the top of the script on that PC and maps
+# to the entity input_boolean.mic_active_<source>. Giving each PC its own
+# boolean keeps their idle heartbeats from stomping on each other's state.
+#
+# To add another PC:
+#   1. add its name to the allowed-sources list below,
+#   2. define input_boolean.mic_active_<name> in input_boolean_test.yaml,
+#   3. add the new boolean to the triggers AND the template in automation 2,
+#   4. set $SourceName on that PC's copy of mic_watcher.ps1.
 # ------------------------------------------------------------------------------
 - id: on_air_mic_webhook_sync
-  alias: "On-Air: mic webhook -> mic_active boolean"
+  alias: "On-Air: mic webhook -> per-PC mic booleans"
   mode: queued
   max: 10
   triggers:
     - trigger: webhook
-      webhook_id: mic_active  # must match the webhook URL in mic_watcher.ps1
+      webhook_id: mic_active  # one shared webhook; PCs identify via "source"
       allowed_methods:
         - POST
       local_only: true        # only accept POSTs from the local network
   actions:
-    - if:
-        - condition: template
-          value_template: "{{ trigger.json.active | default(false) | bool(false) }}"
-      then:
-        - action: input_boolean.turn_on
-          target:
-            entity_id: input_boolean.mic_active
-      else:
-        - action: input_boolean.turn_off
-          target:
-            entity_id: input_boolean.mic_active
+    - variables:
+        source: "{{ trigger.json.source | default('unknown') }}"
+        active: "{{ trigger.json.active | default(false) | bool(false) }}"
+    # Drop posts from unknown sources (typo'd $SourceName, stray requests).
+    - condition: template
+      value_template: "{{ source in ['laptop', 'gaming'] }}"
+    - action: "input_boolean.turn_{{ 'on' if active else 'off' }}"
+      target:
+        entity_id: "input_boolean.mic_active_{{ source }}"
 
 # ------------------------------------------------------------------------------
-# 2. On-air logic: light ON while (in a meeting) OR (mic in use), OFF otherwise.
+# 2. On-air logic: light ON while (in a meeting) OR (any mic in use), OFF
+#    otherwise.
 #
 # REPLACE calendar.on_air_calendar with your real Microsoft 365 calendar
 # entity id (find it under Developer Tools -> States, filter "calendar.").
@@ -47,14 +54,15 @@
 - id: on_air_light_control
   alias: "On-Air: calendar or mic -> light"
   description: >-
-    Turns the on-air light on while a calendar event is in progress or the PC
-    microphone is in use, and off when neither is true.
+    Turns the on-air light on while a calendar event is in progress or any
+    PC's microphone is in use, and off when none of those are true.
   mode: restart
   triggers:
     - trigger: state
       entity_id:
         - calendar.on_air_calendar   # REPLACE with your calendar entity
-        - input_boolean.mic_active
+        - input_boolean.mic_active_laptop
+        - input_boolean.mic_active_gaming
     # Re-evaluate after an HA restart so the light matches reality on boot.
     - trigger: homeassistant
       event: start
@@ -63,7 +71,8 @@
         - condition: template
           value_template: >-
             {{ is_state('calendar.on_air_calendar', 'on')
-               or is_state('input_boolean.mic_active', 'on') }}
+               or is_state('input_boolean.mic_active_laptop', 'on')
+               or is_state('input_boolean.mic_active_gaming', 'on') }}
       then:
         # ---- TEST TARGET (before hardware arrives) -------------------------
         - action: input_boolean.turn_on

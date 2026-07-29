@@ -11,7 +11,7 @@ default_config:
 automation: !include automations.yaml
 
 # Test helper that stands in for the physical light until hardware arrives,
-# plus the input_boolean that mirrors the PC mic state.
+# plus the per-PC booleans that mirror each machine's mic state.
 input_boolean: !include input_boolean_test.yaml
 
 # ------------------------------------------------------------------------------

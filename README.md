@@ -15,8 +15,9 @@ Windows PC mic usage ──(webhook POST)───────┘        (Pi, Do
   runs the `calendar busy OR mic active → light` automation.
 - **Calendar trigger:** the MS365 Calendar integration polls the Graph API for
   the current meeting state.
-- **Mic trigger:** a tiny PowerShell watcher on the PC monitors the microphone
-  ConsentStore registry keys and POSTs state changes to an HA webhook.
+- **Mic trigger:** a tiny PowerShell watcher on each Windows PC monitors the
+  microphone ConsentStore registry keys and POSTs state changes to a shared HA
+  webhook, each PC tagged with its own `source` name.
 - Until the hardware arrives, `input_boolean.on_air_test` stands in for the
   light so the whole pipeline is testable in the HA UI.
 

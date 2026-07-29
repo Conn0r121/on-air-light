@@ -15,8 +15,11 @@ Store/UWP apps live directly under ...\ConsentStore\microphone\, classic
 desktop apps (Discord, Zoom, etc.) under ...\microphone\NonPackaged\.
 
 On every state change — and every $HeartbeatSeconds as a re-sync in case HA
-restarted or missed a post — the script POSTs {"active": true|false} to the
-Home Assistant webhook configured below.
+restarted or missed a post — the script POSTs
+{"active": true|false, "source": "<name>"} to the Home Assistant webhook
+configured below. The "source" name identifies THIS PC, so the script can run
+on several machines (laptop, gaming PC, ...) sharing one webhook, each mapped
+to its own input_boolean.mic_active_<source> in HA.
 
 Run it manually in a console first to verify it works, then use
 install-startup-task.ps1 to keep it running in the background at every login.
@@ -27,6 +30,12 @@ No admin rights required: everything here is HKCU reads + an outbound POST.
 # EDIT: your Home Assistant webhook URL. The trailing path segment must match
 # the `webhook_id` in homeassistant/automations.yaml.
 $WebhookUrl = 'http://<pi-ip>:8123/api/webhook/mic_active'
+
+# EDIT: short name identifying THIS PC. Must be listed in the allowed-sources
+# guard in homeassistant/automations.yaml and have a matching
+# input_boolean.mic_active_<name>. Lowercase letters/digits/underscores only
+# (it becomes part of an HA entity id).
+$SourceName = 'laptop'       # e.g. 'laptop' or 'gaming'
 
 $PollIntervalSeconds = 2     # how often to check the registry
 $HeartbeatSeconds    = 300   # re-send the current state this often even if
@@ -84,8 +93,12 @@ if ($WebhookUrl -like '*<pi-ip>*') {
     Write-Log 'ERROR: Edit $WebhookUrl at the top of this script first (it still contains the <pi-ip> placeholder).'
     exit 1
 }
+if ($SourceName -notmatch '^[a-z0-9_]+$') {
+    Write-Log "ERROR: `$SourceName must be lowercase letters/digits/underscores only (got '$SourceName')."
+    exit 1
+}
 
-Write-Log "mic_watcher started (PID $PID). Polling every ${PollIntervalSeconds}s; posting to $WebhookUrl"
+Write-Log "mic_watcher started (PID $PID, source '$SourceName'). Polling every ${PollIntervalSeconds}s; posting to $WebhookUrl"
 
 $lastSent     = $null                  # last state successfully delivered to HA
 $lastSentTime = [DateTime]::MinValue
@@ -100,7 +113,7 @@ while ($true) {
         $heartbeatDue = (((Get-Date) - $lastSentTime).TotalSeconds -ge $HeartbeatSeconds)
 
         if ($stateChanged -or $heartbeatDue) {
-            $body = @{ active = $isActive } | ConvertTo-Json -Compress
+            $body = @{ active = $isActive; source = $SourceName } | ConvertTo-Json -Compress
             try {
                 Invoke-RestMethod -Uri $WebhookUrl -Method Post -ContentType 'application/json' `
                     -Body $body -TimeoutSec 5 | Out-Null

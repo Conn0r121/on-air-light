@@ -49,8 +49,9 @@ be done before the hardware arrives.
 2. Restart the container (Portainer → Containers → `homeassistant` → Restart).
 
 3. Verify: in HA, **Developer Tools → States** should now show
-   `input_boolean.on_air_test` and `input_boolean.mic_active`. Add both to a
-   dashboard so you can watch them flip during testing.
+   `input_boolean.on_air_test`, `input_boolean.mic_active_laptop`, and
+   `input_boolean.mic_active_gaming`. Add them to a dashboard so you can watch
+   them flip during testing.
 
 ## Part 3 — Microsoft 365 calendar integration
 
@@ -113,17 +114,28 @@ Edit `/srv/on-air-light/homeassistant/automations.yaml` and replace
 
 ## Part 4 — Windows mic detector
 
-1. Clone (or copy) this repo onto your Windows PC.
-2. Edit `windows-mic-detector/mic_watcher.ps1`: set `$WebhookUrl` at the top to
-   `http://<pi-ip>:8123/api/webhook/mic_active` with your Pi's real IP.
+The watcher can run on any number of PCs (laptop, gaming PC, ...). All of them
+POST to the same webhook; each identifies itself with a `source` name that maps
+to its own `input_boolean.mic_active_<source>` in HA. The repo ships with two
+sources allowed: `laptop` and `gaming` (to add more, see the comment at the top
+of [automations.yaml](../homeassistant/automations.yaml)).
+
+Do the following on **each** PC:
+
+1. Clone (or copy) this repo onto the PC.
+2. Edit `windows-mic-detector/mic_watcher.ps1` at the top:
+   - `$WebhookUrl`: `http://<pi-ip>:8123/api/webhook/mic_active` with your
+     Pi's real IP.
+   - `$SourceName`: this PC's name — `laptop` or `gaming`.
 3. First, prove the webhook path works with a manual POST from PowerShell:
 
    ```powershell
-   Invoke-RestMethod -Uri 'http://<pi-ip>:8123/api/webhook/mic_active' -Method Post -ContentType 'application/json' -Body '{"active": true}'
+   Invoke-RestMethod -Uri 'http://<pi-ip>:8123/api/webhook/mic_active' -Method Post -ContentType 'application/json' -Body '{"active": true, "source": "laptop"}'
    ```
 
-   `input_boolean.mic_active` (and `on_air_test`, via the light automation)
-   should flip on in HA. Send `{"active": false}` to flip it back.
+   `input_boolean.mic_active_laptop` (and `on_air_test`, via the light
+   automation) should flip on in HA. Send `{"active": false, "source": "laptop"}`
+   to flip it back.
 
 4. Run the watcher interactively:
 
@@ -150,8 +162,8 @@ Edit `/srv/on-air-light/homeassistant/automations.yaml` and replace
 
 With `input_boolean.on_air_test` on a dashboard:
 
-- **Mic path:** start/stop a mic-using app → `on_air_test` follows within a
-  few seconds.
+- **Mic path:** start/stop a mic-using app (on each PC) → `on_air_test`
+  follows within a few seconds.
 - **Calendar path:** create a short Outlook meeting starting now →
   `on_air_test` turns on within a minute or so (the integration polls Graph),
   and off after the meeting ends.
@@ -217,8 +229,10 @@ removed whenever you like.
   count as "busy"; to ignore them, extend the template to
   `is_state('calendar.X', 'on') and not state_attr('calendar.X', 'all_day')`.
 - **Webhook POST returns 200 but nothing happens** — webhook IDs must match
-  exactly (`mic_active`), and the automation must be loaded (Settings →
-  Automations should list both). HA returns 200 even for unknown webhook ids.
+  exactly (`mic_active`), the payload's `source` must be one of the allowed
+  names in the automation's guard condition (`laptop`, `gaming`), and the
+  automation must be loaded (Settings → Automations should list both). HA
+  returns 200 even for unknown webhook ids and dropped sources.
 - **Mic never reads active** — check the log file, then inspect
   `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone`
   in `regedit` while on a call: some subkey should have `LastUsedTimeStop = 0`.
