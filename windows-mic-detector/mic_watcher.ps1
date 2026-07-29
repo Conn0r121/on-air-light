@@ -86,7 +86,9 @@ function Get-ActiveMicApps {
             }
         }
     }
-    return ,$active
+    # Plain return: callers wrap with @(), which rebuilds the array cleanly.
+    # (`return ,$active` here would double-wrap and make idle look active.)
+    return $active
 }
 
 if ($WebhookUrl -like '*<pi-ip>*') {
