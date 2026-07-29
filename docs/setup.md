@@ -154,7 +154,8 @@ Do the following on **each** PC:
    .\install-startup-task.ps1
    ```
 
-   It starts immediately and re-starts at every login. Logs go to
+   It starts immediately, runs with no visible window (via a small VBScript
+   launcher), and re-starts at every login. Logs go to
    `%LOCALAPPDATA%\on-air-light\mic_watcher.log`. To remove:
    `.\install-startup-task.ps1 -Uninstall`.
 
