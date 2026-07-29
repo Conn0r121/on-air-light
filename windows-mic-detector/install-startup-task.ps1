@@ -37,7 +37,9 @@ if (-not (Test-Path $WatcherPath)) {
 }
 
 # Refuse to install a watcher that still points at the placeholder URL.
-if ((Get-Content -Path $WatcherPath -Raw) -match '<pi-ip>') {
+# Only inspect the $WebhookUrl assignment line — the placeholder string also
+# appears in the watcher's own runtime guard and comments.
+if (Select-String -Path $WatcherPath -Pattern '^\s*\$WebhookUrl\s*=\s*.*<pi-ip>' -Quiet) {
     Write-Error 'Edit $WebhookUrl at the top of mic_watcher.ps1 first (it still contains the <pi-ip> placeholder).'
     exit 1
 }
