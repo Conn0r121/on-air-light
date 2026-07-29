@@ -1,0 +1,35 @@
+# Home Assistant base configuration for the On-Air Light.
+#
+# Copy this file (plus automations.yaml and input_boolean_test.yaml) into the
+# HA config directory on the Pi (/srv/on-air-light/homeassistant by default),
+# replacing the auto-generated configuration.yaml, then restart the container.
+
+# Sane defaults: frontend, config UI, mobile app, history, webhook support,
+# and zeroconf (needed to auto-discover the ESPHome device).
+default_config:
+
+automation: !include automations.yaml
+
+# Test helper that stands in for the physical light until hardware arrives,
+# plus the input_boolean that mirrors the PC mic state.
+input_boolean: !include input_boolean_test.yaml
+
+# ------------------------------------------------------------------------------
+# Microsoft 365 calendar (meeting detection)
+# ------------------------------------------------------------------------------
+# The Outlook/M365 calendar comes in through the "Microsoft 365 Calendar"
+# custom integration (github.com/RogerSelwyn/MS365-Calendar), installed via
+# HACS and configured entirely in the UI — which is why there is intentionally
+# no YAML block for it here:
+#
+#   Settings -> Devices & Services -> Add Integration -> "Microsoft 365 Calendar"
+#
+# The config flow asks for three values that come from an Azure app
+# registration (click-by-click guide in docs/setup.md):
+#
+#   * Application (client) ID   - Azure portal -> App registrations -> Overview
+#   * Client secret             - App registration -> Certificates & secrets
+#   * Directory (tenant) ID     - App registration -> Overview
+#
+# Once configured it creates a calendar entity (e.g. calendar.<account>_calendar).
+# Put that entity id into automations.yaml where marked with REPLACE.

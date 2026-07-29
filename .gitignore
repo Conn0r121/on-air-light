@@ -1,0 +1,19 @@
+# Real secrets — never commit these
+esphome/secrets.yaml
+homeassistant/secrets.yaml
+.env
+*.env
+
+# Logs
+*.log
+
+# ESPHome build output (if you ever compile inside the repo)
+esphome/.esphome/
+
+# Home Assistant runtime files (if a live /config ever points at the repo)
+homeassistant/.storage/
+homeassistant/.cloud/
+homeassistant/deps/
+homeassistant/tts/
+homeassistant/*.db
+homeassistant/*.db-*

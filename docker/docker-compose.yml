@@ -1,0 +1,50 @@
+# On-Air Light — Portainer stack
+# Deploys Home Assistant (automation hub) + the ESPHome dashboard (firmware builder).
+#
+# >>> EDIT BEFORE DEPLOYING (search this file for "EDIT"):
+#   1. The host-side volume paths — where config data lives on your Pi.
+#   2. TZ — your timezone (this affects when calendar automations fire!).
+#
+# Portainer: Stacks -> Add stack -> Repository, point it at this repo and set
+# "Compose path" to docker/docker-compose.yml.
+
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: homeassistant/home-assistant:stable
+    # Host networking is required for mDNS/zeroconf auto-discovery of the
+    # ESPHome device. HA will be reachable at http://<pi-ip>:8123.
+    network_mode: host
+    environment:
+      - TZ=America/New_York            # EDIT: your timezone
+    volumes:
+      # EDIT: left side = where HA config lives on the Pi. Create it first:
+      #   sudo mkdir -p /srv/on-air-light/homeassistant
+      # After the first start, copy this repo's homeassistant/*.yaml files
+      # into it and restart the container (see docs/setup.md).
+      - /srv/on-air-light/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+
+  esphome:
+    container_name: esphome
+    image: esphome/esphome:latest
+    ports:
+      - "6052:6052"                    # ESPHome dashboard: http://<pi-ip>:6052
+    environment:
+      - TZ=America/New_York            # EDIT: your timezone
+      # The dashboard runs on bridge networking (no mDNS), so use ping to
+      # show device online/offline status instead:
+      - ESPHOME_DASHBOARD_USE_PING=true
+    volumes:
+      # EDIT: left side = where ESPHome configs live on the Pi. Create it first:
+      #   sudo mkdir -p /srv/on-air-light/esphome
+      # Copy this repo's esphome/on-air-light.yaml plus your filled-in
+      # secrets.yaml (from secrets.yaml.example) into it.
+      - /srv/on-air-light/esphome:/config
+    # Uncomment to flash a board plugged into the Pi's USB port straight from
+    # the dashboard (only needed for the very first flash — updates after that
+    # are over-the-air). The device name may differ; check `ls /dev/tty*`.
+    # devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
+    restart: unless-stopped

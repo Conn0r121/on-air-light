@@ -1,0 +1,15 @@
+# Included from configuration.yaml via `input_boolean: !include input_boolean_test.yaml`
+
+# Stand-in for the physical light until the D1 Mini arrives. Watch it flip in
+# the HA UI (add it to a dashboard, or see Settings -> Devices & Services ->
+# Helpers). Safe to delete once the real light is wired in and working.
+on_air_test:
+  name: On Air (test light)
+  icon: mdi:broadcast
+
+# Mirrors the microphone state reported by windows-mic-detector/mic_watcher.ps1.
+# The webhook automation keeps it in sync; the light automation reads it.
+# Keep this one even after the hardware arrives.
+mic_active:
+  name: Mic active (office PC)
+  icon: mdi:microphone

@@ -1,0 +1,89 @@
+# On-Air Light automations.
+# Loaded from configuration.yaml via `automation: !include automations.yaml`.
+#
+# Two automations:
+#   1. mic webhook  -> input_boolean.mic_active   (stores the mic state)
+#   2. calendar OR mic -> light                   (the actual on-air logic)
+
+# ------------------------------------------------------------------------------
+# 1. Mirror the PC mic state into input_boolean.mic_active.
+#
+# windows-mic-detector/mic_watcher.ps1 POSTs {"active": true|false} to:
+#   http://<pi-ip>:8123/api/webhook/mic_active
+#
+# Webhook triggers are fire-and-forget and carry no state of their own, so the
+# last-reported state is stored in an input_boolean that templates can read.
+# ------------------------------------------------------------------------------
+- id: on_air_mic_webhook_sync
+  alias: "On-Air: mic webhook -> mic_active boolean"
+  mode: queued
+  max: 10
+  triggers:
+    - trigger: webhook
+      webhook_id: mic_active  # must match the webhook URL in mic_watcher.ps1
+      allowed_methods:
+        - POST
+      local_only: true        # only accept POSTs from the local network
+  actions:
+    - if:
+        - condition: template
+          value_template: "{{ trigger.json.active | default(false) | bool(false) }}"
+      then:
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.mic_active
+      else:
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.mic_active
+
+# ------------------------------------------------------------------------------
+# 2. On-air logic: light ON while (in a meeting) OR (mic in use), OFF otherwise.
+#
+# REPLACE calendar.on_air_calendar with your real Microsoft 365 calendar
+# entity id (find it under Developer Tools -> States, filter "calendar.").
+# It appears twice below: once in the triggers, once in the template.
+# ------------------------------------------------------------------------------
+- id: on_air_light_control
+  alias: "On-Air: calendar or mic -> light"
+  description: >-
+    Turns the on-air light on while a calendar event is in progress or the PC
+    microphone is in use, and off when neither is true.
+  mode: restart
+  triggers:
+    - trigger: state
+      entity_id:
+        - calendar.on_air_calendar   # REPLACE with your calendar entity
+        - input_boolean.mic_active
+    # Re-evaluate after an HA restart so the light matches reality on boot.
+    - trigger: homeassistant
+      event: start
+  actions:
+    - if:
+        - condition: template
+          value_template: >-
+            {{ is_state('calendar.on_air_calendar', 'on')
+               or is_state('input_boolean.mic_active', 'on') }}
+      then:
+        # ---- TEST TARGET (before hardware arrives) -------------------------
+        - action: input_boolean.turn_on
+          target:
+            entity_id: input_boolean.on_air_test
+        # ---- REAL LIGHT: once the D1 Mini is flashed, delete the two lines
+        # ---- above and uncomment below. Verify the exact entity id in HA
+        # ---- under Settings -> Devices & Services -> ESPHome -> On-Air Light.
+        # - action: light.turn_on
+        #   target:
+        #     entity_id: light.on_air_light
+        #   data:
+        #     brightness_pct: 60
+        #     rgb_color: [255, 0, 0]  # classic on-air red; [255, 170, 90] = warm white
+      else:
+        # ---- TEST TARGET ----------------------------------------------------
+        - action: input_boolean.turn_off
+          target:
+            entity_id: input_boolean.on_air_test
+        # ---- REAL LIGHT ------------------------------------------------------
+        # - action: light.turn_off
+        #   target:
+        #     entity_id: light.on_air_light

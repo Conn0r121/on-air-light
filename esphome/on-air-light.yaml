@@ -1,0 +1,66 @@
+# ESPHome firmware for the on-air light.
+# Hardware: Wemos/LOLIN D1 Mini (ESP8266) + WS2812B LED strip.
+#
+# Wiring (power notes in docs/setup.md):
+#   strip 5V  -> D1 Mini "5V" pin
+#   strip GND -> D1 Mini "G" pin
+#   strip DIN -> D1 Mini "RX" pin (GPIO3)   <- required by the esp8266_dma method
+#
+# This file is ready to flash once the board arrives — no other repo changes
+# needed. Copy it, plus a filled-in secrets.yaml (see secrets.yaml.example),
+# into the ESPHome dashboard's config directory and hit Install.
+
+esphome:
+  name: on-air-light
+  friendly_name: On-Air Light
+
+esp8266:
+  board: d1_mini
+
+logger:
+  # GPIO3 (RX) is taken over by the LED data line (esp8266_dma), so serial
+  # logging must be disabled. Logs are still available wirelessly through the
+  # ESPHome dashboard / native API once the device is on WiFi.
+  baud_rate: 0
+
+# Native API — lets Home Assistant auto-discover and control the device.
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Over-the-air updates — after the first USB flash, all updates go over WiFi.
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # If WiFi is unreachable, the device opens its own hotspot with a captive
+  # portal so you can fix credentials without re-flashing over USB.
+  ap:
+    ssid: "On-Air-Light Setup"
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+light:
+  - platform: neopixelbus
+    id: on_air_light
+    name: "On-Air Light"
+    variant: WS2812X          # correct timing variant for WS2812B strips
+    type: GRB                 # WS2812B color order
+    pin: GPIO3                # esp8266_dma only works on GPIO3 (the RX pin)
+    method:
+      type: esp8266_dma
+    num_leds: 8               # EDIT: number of LEDs on your strip
+    restore_mode: ALWAYS_OFF  # stay dark after a power cycle until HA says otherwise
+    default_transition_length: 400ms
+    # Color/brightness are chosen by the HA automation when it turns the light
+    # on (see homeassistant/automations.yaml), so nothing to configure here.
+    # Optional: a gentle pulse effect selectable from HA instead of steady-on.
+    # effects:
+    #   - pulse:
+    #       name: "Slow Pulse"
+    #       transition_length: 1.5s
+    #       update_interval: 1.5s
