@@ -159,6 +159,19 @@ Do the following on **each** PC:
    `%LOCALAPPDATA%\on-air-light\mic_watcher.log`. To remove:
    `.\install-startup-task.ps1 -Uninstall`.
 
+### Discord mute detection
+
+Sitting in a Discord voice channel holds the mic open even while self-muted,
+which would keep the light on the whole session. With `$DiscordMuteDetection =
+$true` (the default), the watcher asks the local Discord client for your
+actual mute/deafen state over its RPC socket and treats "in channel but
+muted" as idle. The **first time** this triggers on each PC, Discord shows an
+authorization popup — click **Authorize** (the token is cached afterwards; if
+you miss the popup it re-appears at most hourly, or restart the watcher). If
+Discord isn't running or was never authorized, detection falls back to the
+plain behavior: mic held by Discord counts as active. Note this is
+Discord-only — a muted Teams/Zoom call still reads as on-air.
+
 ## Part 5 — End-to-end test (no hardware)
 
 With `input_boolean.on_air_test` on a dashboard:
